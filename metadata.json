@@ -1,0 +1,5 @@
+{
+  "name": "Weekly Work Schedule",
+  "description": "A web application to display a weekly work schedule, similar to a provided template.",
+  "requestFramePermissions": []
+}
