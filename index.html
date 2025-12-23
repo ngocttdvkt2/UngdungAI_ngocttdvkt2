@@ -18,5 +18,17 @@
 </head>
   <body class="bg-gray-50">
     <div id="root"></div>
-  </body>
+
+    <script type="module">
+        import React from 'react';
+        import ReactDOM from 'react-dom';
+
+        const App = () => {
+            return React.createElement('h1', { className: 'text-2xl p-5' }, 'Ứng dụng đã chạy thành công!');
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
 </html>
