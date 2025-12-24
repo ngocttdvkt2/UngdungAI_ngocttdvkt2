@@ -6,7 +6,6 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
         base: '/ngocttdvkt2/UngdungAI_ngocttdvkt2/',
-
         server: {
         port: 3000,
         host: '0.0.0.0',
