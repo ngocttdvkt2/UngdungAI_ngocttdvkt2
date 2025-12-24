@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { ScheduleDay, ScheduleEvent } from './types';
 import ScheduleTable from './components/ScheduleTable';
+import { getSchedule, saveSchedule } from './db';
 
 const App: React.FC = () => {
   const [scheduleData, setScheduleData] = useState<ScheduleDay[]>([]);
@@ -21,53 +22,53 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    try {
-      const storedData = localStorage.getItem('weeklySchedule');
-      const monday = getMonday(new Date());
-      const mondayISO = monday.toISOString().split('T')[0]; // Unique ID for the current week
+    const loadSchedule = async () => {
+      try {
+        const monday = getMonday(new Date());
+        const weekId = monday.toISOString().split('T')[0]; // Unique ID for the current week
+        
+        const storedSchedule = await getSchedule(weekId);
 
-      if (storedData) {
-        const parsedData = JSON.parse(storedData);
-        if (parsedData.weekId === mondayISO) {
-          setScheduleData(parsedData.schedule);
-          return;
+        if (storedSchedule) {
+          setScheduleData(storedSchedule);
+        } else {
+          // If no data for the current week, generate a blank schedule
+          const vietnameseDays = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
+          const newWeekData: ScheduleDay[] = [];
+          for (let i = 0; i < 7; i++) {
+            const day = new Date(monday);
+            day.setDate(monday.getDate() + i);
+            newWeekData.push({
+              date: formatDate(day),
+              dayOfWeek: vietnameseDays[i],
+              events: []
+            });
+          }
+          setScheduleData(newWeekData);
+          await saveSchedule(weekId, newWeekData); // Save the new blank week to DB
         }
+      } catch (error) {
+        console.error("Failed to load or initialize schedule data:", error);
+        // Fallback to a blank schedule if IndexedDB fails
+        setScheduleData([]);
       }
-      
-      // If no data or data is for a different week, generate a blank schedule
-      const vietnameseDays = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
-      const newWeekData: ScheduleDay[] = [];
-      for (let i = 0; i < 7; i++) {
-        const day = new Date(monday);
-        day.setDate(monday.getDate() + i);
-        newWeekData.push({
-          date: formatDate(day),
-          dayOfWeek: vietnameseDays[i],
-          events: []
-        });
-      }
-      setScheduleData(newWeekData);
-
-    } catch (error) {
-      console.error("Failed to load or initialize schedule data:", error);
-      // Fallback to a blank schedule if localStorage fails
-      setScheduleData([]);
-    }
+    };
+    
+    loadSchedule();
   }, []);
 
-  const updateSchedule = (newSchedule: ScheduleDay[]) => {
-    setScheduleData(newSchedule);
+  const persistSchedule = async (newSchedule: ScheduleDay[]) => {
     try {
       const monday = getMonday(new Date());
-      const mondayISO = monday.toISOString().split('T')[0];
-      localStorage.setItem('weeklySchedule', JSON.stringify({ weekId: mondayISO, schedule: newSchedule }));
+      const weekId = monday.toISOString().split('T')[0];
+      await saveSchedule(weekId, newSchedule);
     } catch (error) {
       console.error("Failed to save schedule data:", error);
     }
   };
 
 
-  const handleAddEvent = (dayIndex: number, newEventData: Omit<ScheduleEvent, 'id' | 'detailedParticipants' | 'isOnlineMeeting'>) => {
+  const handleAddEvent = async (dayIndex: number, newEventData: Omit<ScheduleEvent, 'id' | 'detailedParticipants' | 'isOnlineMeeting'>) => {
     const newSchedule = [...scheduleData];
     const newEvent: ScheduleEvent = {
       ...newEventData,
@@ -75,21 +76,24 @@ const App: React.FC = () => {
       lastModified: Date.now(),
     };
     newSchedule[dayIndex].events.push(newEvent);
-    updateSchedule(newSchedule);
+    setScheduleData(newSchedule);
+    await persistSchedule(newSchedule);
   };
 
-  const handleEditEvent = (dayIndex: number, updatedEvent: ScheduleEvent) => {
+  const handleEditEvent = async (dayIndex: number, updatedEvent: ScheduleEvent) => {
     const newSchedule = [...scheduleData];
     newSchedule[dayIndex].events = newSchedule[dayIndex].events.map(event => 
       event.id === updatedEvent.id ? { ...updatedEvent, lastModified: Date.now() } : event
     );
-    updateSchedule(newSchedule);
+    setScheduleData(newSchedule);
+    await persistSchedule(newSchedule);
   };
 
-  const handleDeleteEvent = (dayIndex: number, eventId: string) => {
+  const handleDeleteEvent = async (dayIndex: number, eventId: string) => {
     const newSchedule = [...scheduleData];
     newSchedule[dayIndex].events = newSchedule[dayIndex].events.filter(event => event.id !== eventId);
-    updateSchedule(newSchedule);
+    setScheduleData(newSchedule);
+    await persistSchedule(newSchedule);
   };
 
   const getWeekRange = () => {
